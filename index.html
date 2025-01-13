@@ -1,0 +1,310 @@
+<html>
+
+<head>
+  <title>国土地理院 最適化ベクトルタイル 道路中心線（石段）</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src='https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js'></script>
+  <link href='https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css' rel='stylesheet' />
+  <script src="https://unpkg.com/pmtiles@2.11.0/dist/index.js"></script>
+  <script src="https://unpkg.com/@maplibre/maplibre-gl-geocoder@1.2.0/dist/maplibre-gl-geocoder.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@maplibre/maplibre-gl-geocoder@1.2.0/dist/maplibre-gl-geocoder.css"
+    type="text/css" />
+  <style>
+    body {
+      margin: 0;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <script type="text/javascript">
+    // Protocolの設定
+    let protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol('pmtiles', (request) => {
+      return new Promise((resolve, reject) => {
+        const callback = (err, data) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ data });
+          }
+        };
+        protocol.tile(request, callback);
+      });
+    });
+
+    // マップの初期化
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'dark.json',
+      hash: true,
+      zoom: 8.12,
+      center: [139.58, 35.733],
+      pitch: 0,
+      bearing: 0,
+      maxPitch: 85,
+      attributionControl: false,
+    })
+
+    //ジオコーダー（国土地理院 地名検索API）
+    var geocoder_api = {
+      forwardGeocode: async (config) => {
+        const features = [];
+        const Text_Prefix = config.query.substr(0, 3);
+        try {
+          let request =
+            "https://msearch.gsi.go.jp/address-search/AddressSearch?q=" +
+            config.query;
+          const response = await fetch(request);
+          const geojson = await response.json();
+
+          for (var i = 0; i < geojson.length; i++) {
+            if (geojson[i].properties.title.indexOf(Text_Prefix) !== -1) {
+              let point = {
+                type: "Feature",
+                geometry: {
+                  type: "Point",
+                  coordinates: geojson[i].geometry.coordinates,
+                },
+                place_name: geojson[i].properties.title,
+                properties: geojson[i].properties,
+                text: geojson[i].properties.title,
+                place_type: ["place"],
+                center: geojson[i].geometry.coordinates,
+              };
+              features.push(point);
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to forwardGeocode with error: ${e}`);
+        }
+        return {
+          features: features,
+        };
+      },
+    };
+
+    map.addControl(
+      new MaplibreGeocoder(geocoder_api, { maplibregl: maplibregl }),
+      "top-left"
+    );
+
+    // ズーム・回転
+    map.addControl(new maplibregl.NavigationControl());
+
+    // フルスクリーンモードのオンオフ
+    map.addControl(new maplibregl.FullscreenControl());
+
+    // 現在位置表示
+    map.addControl(new maplibregl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: false
+      },
+      fitBoundsOptions: { maxZoom: 18 },
+      trackUserLocation: true,
+      showUserLocation: true
+    }));
+
+    // スケール表示
+    map.addControl(new maplibregl.ScaleControl({
+      maxWidth: 200,
+      unit: 'metric'
+    }));
+
+    // Attributionを折りたたみ表示
+    map.addControl(new maplibregl.AttributionControl({
+      compact: true,
+      customAttribution: '（<a href="https://twitter.com/shi__works" target="_blank">X(旧Twitter)</a> | <a href="" target="_blank">Github</a>） ',
+    }));
+
+    // 3D地形コントロール表示
+    map.addControl(
+      new maplibregl.TerrainControl({
+        source: 'gsidem-terrain-rgb',
+        exaggeration: 1 // 標高を強調する倍率
+      })
+    );
+
+    map.on('load', () => {
+      // 標高タイルソース
+      map.addSource("gsidem-terrain-rgb", {
+        type: 'raster-dem',
+        tiles: [
+          'https://xs489works.xsrv.jp/raster-tiles/gsi/gsi-dem-terrain-rgb/{z}/{x}/{y}.png'
+        ],
+        attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html#dem" target="_blank">地理院タイル(標高タイル)</a>',
+        tileSize: 256
+      });
+
+      // 標高タイルセット
+      map.setTerrain({ 'source': 'gsidem-terrain-rgb', 'exaggeration': 1 });
+
+      // PLATEAU建築物モデル（PMTiles）ソース
+      map.addSource("plateau-pmtiles", {
+        type: "vector",
+        url: "pmtiles://https://pmtiles-data.s3.ap-northeast-1.amazonaws.com/plateau/PLATEAU_2023_LOD0.pmtiles",
+        minzoom: 14,
+        maxzoom: 16,
+        attribution: '<a href="https://www.geospatial.jp/ckan/dataset/plateau">3D都市モデルPLATEAU建築物モデル（国土交通省）</a>'
+      });
+
+      // PLATEAU建築物モデル（PMTiles）レイヤ
+      map.addLayer({
+        'id': 'plateau-pmtiles',
+        'source': 'plateau-pmtiles',
+        'source-layer': "PLATEAU_2023_LOD0",
+        "minzoom": 14,
+        "maxzoom": 23,
+        'type': 'fill-extrusion',
+        'paint': {
+          "fill-extrusion-color": '#FFFFFF',
+          "fill-extrusion-opacity": 0.3,
+          "fill-extrusion-height": ["get", "measured_height"]
+        }
+      });
+
+      // 道路中心線（石段）ポイントソース
+      map.addSource("rdcl-stone-steps-centroid", {
+        type: "vector",
+        url: "pmtiles://https://shiworks.xsrv.jp/pmtiles-data/gsi/optimal_bvmap/RdCL_16_stone_steps_point.pmtiles",
+        minzoom: 4,
+        maxzoom: 16,
+        attribution: '<a href="https://github.com/gsi-cyberjapan/optimal_bvmap">国土地理院 最適化ベクトルタイル（道路中心線）</a>'
+      });
+
+      // 道路中心線（石段）ポイントレイヤ
+      map.addLayer({
+        "id": "rdcl-stone-steps-centroid-1",
+        "type": "circle",
+        "source": "rdcl-stone-steps-centroid",
+        "source-layer": "RdCL_16_stone_steps_point",
+        "minzoom": 4,
+        "maxzoom": 15,
+        "paint": {
+          "circle-color": "#6ff77c",
+          "circle-radius": 15,
+          "circle-blur": 3,
+          "circle-opacity": 0.8
+        }
+      });
+
+      // 道路中心線（石段）ポイントレイヤ
+      map.addLayer({
+        "id": "rdcl-stone-steps-centroid-2",
+        "type": "circle",
+        "source": "rdcl-stone-steps-centroid",
+        "source-layer": "RdCL_16_stone_steps_point",
+        "minzoom": 4,
+        "maxzoom": 15,
+        "paint": {
+          "circle-color": '#00ff37',
+          "circle-radius": 7.5,
+          "circle-blur": 3,
+          "circle-opacity": 0.8
+        }
+      });
+
+      // 道路中心線（石段）ポイントレイヤ
+      map.addLayer({
+        "id": "rdcl-stone-steps-centroid-3",
+        "type": "circle",
+        "source": "rdcl-stone-steps-centroid",
+        "source-layer": "RdCL_16_stone_steps_point",
+        "minzoom": 4,
+        "maxzoom": 15,
+        "paint": {
+          "circle-color": '#ffffff',
+          "circle-radius": 1.5,
+          "circle-blur": 0,
+          "circle-opacity": 1
+        }
+      });
+
+      // 道路中心線（石段）ラインソース
+      map.addSource("rdcl-stone-steps-line", {
+        type: "vector",
+        url: "pmtiles://https://shiworks.xsrv.jp/pmtiles-data/gsi/optimal_bvmap/RdCL_16_stone_steps.pmtiles",
+        minzoom: 4,
+        maxzoom: 16,
+        attribution: '<a href="https://github.com/gsi-cyberjapan/optimal_bvmap">国土地理院 最適化ベクトルタイル（道路中心線）</a>'
+      });
+
+      // 道路中心線（石段）ラインレイヤ
+      map.addLayer({
+        "id": 'rdcl-stone-steps-line-1',
+        "type": 'line',
+        "source": "rdcl-stone-steps-line",
+        "source-layer": "RdCL_16_stone_steps",
+        "minzoom": 15,
+        "maxzoom": 23,
+        "layout": {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        "paint": {
+          'line-color': 'rgba(0, 112, 32, 0.3)',
+          'line-width': 12,
+          'line-blur': 0.8
+        }
+      });
+
+      // 道路中心線（石段）ラインレイヤ
+      map.addLayer({
+        "id": 'rdcl-stone-steps-line-2',
+        "type": 'line',
+        "source": "rdcl-stone-steps-line",
+        "source-layer": "RdCL_16_stone_steps",
+        "minzoom": 15,
+        "maxzoom": 23,
+        "layout": {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        "paint": {
+          'line-color': 'rgba(0, 172, 64, 0.6)',
+          'line-width': 6,
+          'line-blur': 0.4
+        }
+      });
+
+      // 道路中心線（石段）ラインレイヤ
+      map.addLayer({
+        "id": 'rdcl-stone-steps-line-3',
+        "type": 'line',
+        "source": "rdcl-stone-steps-line",
+        "source-layer": "RdCL_16_stone_steps",
+        "minzoom": 15,
+        "maxzoom": 23,
+        "layout": {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        "paint": {
+          'line-color': 'rgba(220, 236, 220, 1)',
+          'line-width': 1.5
+        }
+      });
+
+      // Skyレイヤ
+      map.setSky({
+        "sky-color": "#199EF3",
+        "sky-horizon-blend": 0.7,
+        "horizon-color": "#f0f8ff",
+        "horizon-fog-blend": 0.8,
+        "fog-color": "#2c7fb8",
+        "fog-ground-blend": 0.9,
+        "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 0]
+      });
+
+    })
+  </script>
+</body>
+
+</html>
