@@ -137,7 +137,7 @@
       map.addSource("gsidem-terrain-rgb", {
         type: 'raster-dem',
         tiles: [
-          'https://xs489works.xsrv.jp/raster-tiles/gsi/gsi-dem-terrain-rgb/{z}/{x}/{y}.png'
+          'https://shi-works.com/raster-tiles/gsi/gsi-dem-terrain-rgb/{z}/{x}/{y}.png'
         ],
         attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html#dem" target="_blank">地理院タイル(標高タイル)</a>',
         tileSize: 256
@@ -173,7 +173,7 @@
       // 道路中心線（石段）ポイントソース
       map.addSource("rdcl-stone-steps-centroid", {
         type: "vector",
-        url: "pmtiles://https://shiworks.xsrv.jp/pmtiles-data/gsi/optimal_bvmap/RdCL_16_stone_steps_point.pmtiles",
+        url: "pmtiles://https://shi-works.com/pmtiles/gsi/optimal_bvmap/RdCL_16_stone_steps_point.pmtiles",
         minzoom: 4,
         maxzoom: 16,
         attribution: '<a href="https://github.com/gsi-cyberjapan/optimal_bvmap">国土地理院 最適化ベクトルタイル（道路中心線）</a>'
@@ -230,7 +230,7 @@
       // 道路中心線（石段）ラインソース
       map.addSource("rdcl-stone-steps-line", {
         type: "vector",
-        url: "pmtiles://https://shiworks.xsrv.jp/pmtiles-data/gsi/optimal_bvmap/RdCL_16_stone_steps.pmtiles",
+        url: "pmtiles://https://shi-works.com/pmtiles/gsi/optimal_bvmap/RdCL_16_stone_steps.pmtiles",
         minzoom: 4,
         maxzoom: 16,
         attribution: '<a href="https://github.com/gsi-cyberjapan/optimal_bvmap">国土地理院 最適化ベクトルタイル（道路中心線）</a>'
